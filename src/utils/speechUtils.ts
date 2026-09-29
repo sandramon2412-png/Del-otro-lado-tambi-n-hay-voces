@@ -1,4 +1,4 @@
-// Hybrid Neural Studio Voice & Natural Browser Engine with Quota Detection
+// Hybrid Neural Studio Voice & Natural Browser Engine with Quota Detection & Error Handling
 
 export interface VoiceProfile {
   id: string;
@@ -21,9 +21,9 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     description: 'Tono cálido, empático y maternal. Ritmo reposado para relatos testimoniales.',
     gender: 'female',
     geminiVoice: 'Kore',
-    stylePrompt: 'Lee con voz humana femenina, cálida, reflexiva y suavemente emotiva en español latinoamericano',
+    stylePrompt: 'Lee este testimonio como una mujer madura, con una voz muy natural, cálida y empática. Habla pausadamente, con respiraciones sutiles. Enfatiza las palabras clave sin exagerar. Tono reflexivo y sereno, como compartiendo una historia importante. Pronuncia en español colombiano claro. Parece un podcast donde alguien cuenta su historia con sensibilidad.',
     pitch: 1.05,
-    rate: 0.94,
+    rate: 0.90,
     icon: '👩',
   },
   {
@@ -33,9 +33,9 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     description: 'Tono grave, solemne y pausado con presencia de memoria histórica.',
     gender: 'male',
     geminiVoice: 'Fenrir',
-    stylePrompt: 'Lee con voz humana masculina grave, solemne, pausada y respetuosa en español',
+    stylePrompt: 'Lee con la profundidad de un historiador reflexivo. Voz masculina grave pero cálida, no robótica. Habla lentamente, con pausas claras entre frases. Enfatiza la importancia de las palabras sin dramatismo excesivo. Tono solemne pero accesible. Respiración natural. Pronuncia en español latinoamericano. Parece alguien leyendo un documento histórico importante con respeto y cuidado.',
     pitch: 0.82,
-    rate: 0.88,
+    rate: 0.85,
     icon: '👨',
   },
   {
@@ -45,33 +45,38 @@ export const VOICE_PROFILES: VoiceProfile[] = [
     description: 'Tono ágil, claro y directo, propio de la investigación y juventud.',
     gender: 'young',
     geminiVoice: 'Aoede',
-    stylePrompt: 'Lee con voz humana joven, lúcida, compasiva y fluida en español',
-    pitch: 1.18,
-    rate: 1.0,
+    stylePrompt: 'Lee como una investigadora joven, con claridad y energía contenida. Voz femenina natural, ágil pero no apresurada. Buena pronunciación, fluida. Tono conversacional, como en una entrevista de radio. Respiraciones naturales. Enfatiza los detalles importantes. Pronuncia en español claro y educado. Parece alguien apasionada por contar una historia verdadera.',
+    pitch: 1.15,
+    rate: 0.98,
     icon: '👧',
   },
   {
     id: 'cronica-radio',
     name: 'Crónica Andina',
     role: 'Locución Editorial / Documental',
-    description: 'Voz literaria uniforme, dicción clara para lectura inmersiva continua.',
+    description: 'Voz profesional uniforme para lectura inmersiva continua.',
     gender: 'male',
     geminiVoice: 'Puck',
-    stylePrompt: 'Lee con voz de narrador literario de audiolibro, clara, solemne y envolvente en español',
+    stylePrompt: 'Lee como un narrador de audiolibro profesional. Voz clara, profunda y envolvente. Pronunciación perfecta, sin aceleración. Pausas naturales al final de párrafos. Tono neutro pero cálido. Empatía contenida. Respiración relajada. Español latinoamericano fluido. Parece una producción de radio de calidad, donde la voz es instrumento del relato.',
     pitch: 0.92,
-    rate: 0.95,
+    rate: 0.92,
     icon: '🎙️',
   },
 ];
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binaryString = window.atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
+  try {
+    const binaryString = window.atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (err) {
+    console.error('Error decoding base64 audio:', err);
+    throw new Error('Failed to decode audio data');
   }
-  return bytes.buffer;
 }
 
 class SpeechEngine {
@@ -82,8 +87,11 @@ class SpeechEngine {
   private isCancelled: boolean = false;
   private onEndCallback: (() => void) | null = null;
   private onStartCallback: (() => void) | null = null;
+  private onErrorCallback: ((err: Error) => void) | null = null;
   private quotaExceeded: boolean = false;
   private isUsingStudioAi: boolean = false;
+  private networkErrorCount: number = 0;
+  private maxNetworkRetries: number = 2;
 
   private getAudioContext(): AudioContext {
     if (!this.audioCtx) {
@@ -91,7 +99,7 @@ class SpeechEngine {
       this.audioCtx = new AudioCtx();
     }
     if (this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume().catch(() => {});
+      this.audioCtx.resume().catch((err) => console.warn('Failed to resume audio context:', err));
     }
     return this.audioCtx;
   }
@@ -185,42 +193,58 @@ class SpeechEngine {
     speedMultiplier?: number;
     onStart?: () => void;
     onEnd?: () => void;
-    onError?: (err: unknown) => void;
+    onError?: (err: Error) => void;
   }) {
     this.stop();
     this.isCancelled = false;
     this.onEndCallback = onEnd || null;
     this.onStartCallback = onStart || null;
+    this.onErrorCallback = onError || null;
+
+    // Validate input
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      const err = new Error('Text is required and cannot be empty');
+      this.onErrorCallback?.(err);
+      this.onEndCallback?.();
+      return;
+    }
+
+    const cleanText = text.trim().substring(0, 2000); // Limit text length
 
     const ctx = this.getAudioContext();
 
     // If quota hasn't previously failed, try Studio AI Voice
-    if (!this.quotaExceeded) {
+    if (!this.quotaExceeded && this.networkErrorCount < this.maxNetworkRetries) {
       try {
         const res = await fetch('/api/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text,
+            text: cleanText,
             voiceName: profile.geminiVoice,
             stylePrompt: profile.stylePrompt,
           }),
+          signal: AbortSignal.timeout(30000), // 30 second timeout
         });
 
         if (res.status === 429) {
-          console.warn('Gemini API Quota exceeded (429). Falling back to natural browser synthesis.');
+          console.warn('Gemini API Quota exceeded (429). Falling back to browser synthesis.');
           this.quotaExceeded = true;
-          this.speakFallback(text, profile, voiceURI, speedMultiplier);
+          this.speakFallback(cleanText, profile, voiceURI, speedMultiplier);
           return;
         }
 
+        if (res.status === 503 || res.status === 502) {
+          throw new Error(`Service temporarily unavailable (${res.status}). Trying again...`);
+        }
+
         if (!res.ok) {
-          throw new Error(`TTS server error: ${res.status}`);
+          throw new Error(`TTS server error: ${res.status} ${res.statusText}`);
         }
 
         const data = await res.json();
         if (!data.audioBase64) {
-          throw new Error('No audio returned');
+          throw new Error('No audio generated by model');
         }
 
         if (this.isCancelled) return;
@@ -246,6 +270,14 @@ class SpeechEngine {
 
         source.onended = () => {
           this.currentSourceNode = null;
+          this.networkErrorCount = 0; // Reset on success
+          this.onEndCallback?.();
+        };
+
+        source.onerror = (err) => {
+          console.error('Audio playback error:', err);
+          this.currentSourceNode = null;
+          this.onErrorCallback?.(new Error('Error during audio playback'));
           this.onEndCallback?.();
         };
 
@@ -255,12 +287,21 @@ class SpeechEngine {
         source.start(0);
         return;
       } catch (err) {
-        console.warn('Studio AI Voice failed, falling back to browser synthesis:', err);
+        this.networkErrorCount++;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.warn(`Studio AI Voice failed (attempt ${this.networkErrorCount}/${this.maxNetworkRetries}): ${errMsg}`);
+        
+        if (this.networkErrorCount < this.maxNetworkRetries) {
+          // Retry with fallback
+          console.log('Retrying with browser synthesis...');
+          this.speakFallback(cleanText, profile, voiceURI, speedMultiplier);
+          return;
+        }
       }
     }
 
     // Fallback to optimized natural browser speech synthesis
-    this.speakFallback(text, profile, voiceURI, speedMultiplier);
+    this.speakFallback(cleanText, profile, voiceURI, speedMultiplier);
   }
 
   private speakFallback(
@@ -270,6 +311,8 @@ class SpeechEngine {
     speedMultiplier: number = 1.0
   ) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      const err = new Error('Speech synthesis not available in this browser');
+      this.onErrorCallback?.(err);
       this.onEndCallback?.();
       return;
     }
@@ -277,7 +320,7 @@ class SpeechEngine {
     this.isUsingStudioAi = false;
     window.speechSynthesis.cancel();
 
-    const cleanText = text.replace(/[\n\r]+/g, ' ').replace(/[«»“”]/g, '"').trim();
+    const cleanText = text.replace(/[\n\r]+/g, ' ').replace(/[«»""]/g, '"').trim();
     if (!cleanText) {
       this.onEndCallback?.();
       return;
@@ -294,6 +337,7 @@ class SpeechEngine {
     utterance.rate = finalRate;
 
     utterance.onstart = () => {
+      console.log(`Speech synthesis started with profile: ${profile.name}`);
       this.onStartCallback?.();
     };
 
@@ -307,7 +351,8 @@ class SpeechEngine {
       this.clearHeartbeat();
       this.activeUtterance = null;
       if (e.error !== 'interrupted' && e.error !== 'canceled') {
-        console.warn('Speech synthesis error:', e);
+        console.warn('Speech synthesis error:', e.error);
+        this.onErrorCallback?.(new Error(`Speech error: ${e.error}`));
       }
       this.onEndCallback?.();
     };
@@ -381,6 +426,7 @@ class SpeechEngine {
 
   public resetQuotaFlag() {
     this.quotaExceeded = false;
+    this.networkErrorCount = 0;
   }
 }
 
