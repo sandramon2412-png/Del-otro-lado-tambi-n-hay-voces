@@ -1,0 +1,7 @@
+{
+  "name": "Del otro lado también hay voces - Libro Digital",
+  "description": "Edición digital e interactiva del libro de testimonios y memoria 'Del otro lado también hay voces: Relatos de vida, memoria y conflicto armado' de la Universidad Mariana.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
