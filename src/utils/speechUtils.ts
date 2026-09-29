@@ -1,4 +1,4 @@
-// Hybrid Neural Studio Voice & Natural Browser Engine with Quota Detection & Error Handling
+// Hybrid Neural Studio Voice & Natural Browser Engine with Enhanced Error Handling & Optimization
 
 export interface VoiceProfile {
   id: string;
@@ -13,53 +13,54 @@ export interface VoiceProfile {
   icon: string;
 }
 
+// Optimized voice profiles with natural, conversational prompts
 export const VOICE_PROFILES: VoiceProfile[] = [
   {
     id: 'elena-female',
     name: 'Elena',
     role: 'Voz Femenina Serena',
-    description: 'Tono cálido, empático y maternal. Ritmo reposado para relatos testimoniales.',
+    description: 'Cálida, empática y maternal. Perfecta para testimonios.',
     gender: 'female',
     geminiVoice: 'Kore',
-    stylePrompt: 'Lee este testimonio como una mujer madura, con una voz muy natural, cálida y empática. Habla pausadamente, con respiraciones sutiles. Enfatiza las palabras clave sin exagerar. Tono reflexivo y sereno, como compartiendo una historia importante. Pronuncia en español colombiano claro. Parece un podcast donde alguien cuenta su historia con sensibilidad.',
-    pitch: 1.05,
-    rate: 0.90,
+    stylePrompt: 'Eres una mujer madura contando historias de vida con empatía. Lee lentamente, con pausas naturales entre frases. Respiración audible pero sutil. Énfasis en palabras clave sin dramatismo. Tono reflexivo, cálido, sereno. Español latinoamericano claro. Parece un podcast donde alguien comparte experiencias reales con sensibilidad. Muy natural, nunca robótica.',
+    pitch: 1.0,
+    rate: 0.88,
     icon: '👩',
   },
   {
     id: 'carlos-male',
     name: 'Carlos',
     role: 'Voz Masculina Reflexiva',
-    description: 'Tono grave, solemne y pausado con presencia de memoria histórica.',
+    description: 'Grave, solemne y pausado. Para memoria histórica.',
     gender: 'male',
     geminiVoice: 'Fenrir',
-    stylePrompt: 'Lee con la profundidad de un historiador reflexivo. Voz masculina grave pero cálida, no robótica. Habla lentamente, con pausas claras entre frases. Enfatiza la importancia de las palabras sin dramatismo excesivo. Tono solemne pero accesible. Respiración natural. Pronuncia en español latinoamericano. Parece alguien leyendo un documento histórico importante con respeto y cuidado.',
-    pitch: 0.82,
-    rate: 0.85,
+    stylePrompt: 'Eres un historiador que comparte testimonios importantes. Voz profunda pero accesible. Habla muy lentamente, con largas pausas entre párrafos. Respiración natural. Tono solemne pero cálido, nunca frío. Énfasis en la gravedad de las palabras, pero con humanidad. Español latinoamericano educado. Parece alguien leyendo un documento histórico en un acto académico respetuoso. Muy natural y emotivo.',
+    pitch: 0.78,
+    rate: 0.82,
     icon: '👨',
   },
   {
     id: 'daniela-young',
     name: 'Daniela',
     role: 'Voz Joven Documental',
-    description: 'Tono ágil, claro y directo, propio de la investigación y juventud.',
+    description: 'Ágil, clara y directa. Para investigación y análisis.',
     gender: 'young',
     geminiVoice: 'Aoede',
-    stylePrompt: 'Lee como una investigadora joven, con claridad y energía contenida. Voz femenina natural, ágil pero no apresurada. Buena pronunciación, fluida. Tono conversacional, como en una entrevista de radio. Respiraciones naturales. Enfatiza los detalles importantes. Pronuncia en español claro y educado. Parece alguien apasionada por contar una historia verdadera.',
-    pitch: 1.15,
-    rate: 0.98,
+    stylePrompt: 'Eres una investigadora joven apasionada por contar historias verdaderas. Voz clara, fluida, energética pero controlada. Pronunciación perfecta. Pausas naturales. Tono conversacional como en una entrevista de radio. Respiración natural. Énfasis en detalles importantes. Español claro y educado. Parece una periodista contando una historia que importa. Muy natural, nunca artificial.',
+    pitch: 1.12,
+    rate: 0.95,
     icon: '👧',
   },
   {
     id: 'cronica-radio',
     name: 'Crónica Andina',
-    role: 'Locución Editorial / Documental',
-    description: 'Voz profesional uniforme para lectura inmersiva continua.',
+    role: 'Locución Editorial Profesional',
+    description: 'Voz de audiolibro. Para lectura completa inmersiva.',
     gender: 'male',
     geminiVoice: 'Puck',
-    stylePrompt: 'Lee como un narrador de audiolibro profesional. Voz clara, profunda y envolvente. Pronunciación perfecta, sin aceleración. Pausas naturales al final de párrafos. Tono neutro pero cálido. Empatía contenida. Respiración relajada. Español latinoamericano fluido. Parece una producción de radio de calidad, donde la voz es instrumento del relato.',
-    pitch: 0.92,
-    rate: 0.92,
+    stylePrompt: 'Eres un narrador profesional de audiolibros. Voz clara, profunda y envolvente. Pronunciación impecable. Pausas naturales al fin de párrafos. Tono neutro pero con matices emocionales sutiles. Respira naturalmente. Español latinoamericano fluido. Parece una producción de radio de calidad profesional donde la voz es instrumento del relato. Nunca robótico, siempre humano.',
+    pitch: 0.90,
+    rate: 0.90,
     icon: '🎙️',
   },
 ];
@@ -108,7 +109,6 @@ class SpeechEngine {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
     const all = window.speechSynthesis.getVoices();
     return [...all].sort((a, b) => {
-      // Prioritize natural Spanish voices
       const aEs = a.lang.startsWith('es');
       const bEs = b.lang.startsWith('es');
       const aNat = a.name.toLowerCase().includes('natural') || a.name.toLowerCase().includes('online');
@@ -177,7 +177,6 @@ class SpeechEngine {
     return candidates[0] || null;
   }
 
-  // Speak: tries Studio AI Voice first, smoothly falls back if quota exhausted
   public async speak({
     text,
     profile,
@@ -201,7 +200,6 @@ class SpeechEngine {
     this.onStartCallback = onStart || null;
     this.onErrorCallback = onError || null;
 
-    // Validate input
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       const err = new Error('Text is required and cannot be empty');
       this.onErrorCallback?.(err);
@@ -209,11 +207,9 @@ class SpeechEngine {
       return;
     }
 
-    const cleanText = text.trim().substring(0, 2000); // Limit text length
-
+    const cleanText = text.trim().substring(0, 2000);
     const ctx = this.getAudioContext();
 
-    // If quota hasn't previously failed, try Studio AI Voice
     if (!this.quotaExceeded && this.networkErrorCount < this.maxNetworkRetries) {
       try {
         const res = await fetch('/api/tts', {
@@ -224,11 +220,11 @@ class SpeechEngine {
             voiceName: profile.geminiVoice,
             stylePrompt: profile.stylePrompt,
           }),
-          signal: AbortSignal.timeout(30000), // 30 second timeout
+          signal: AbortSignal.timeout(30000),
         });
 
         if (res.status === 429) {
-          console.warn('Gemini API Quota exceeded (429). Falling back to browser synthesis.');
+          console.warn('Gemini API Quota exceeded. Falling back to browser synthesis.');
           this.quotaExceeded = true;
           this.speakFallback(cleanText, profile, voiceURI, speedMultiplier);
           return;
@@ -270,7 +266,7 @@ class SpeechEngine {
 
         source.onended = () => {
           this.currentSourceNode = null;
-          this.networkErrorCount = 0; // Reset on success
+          this.networkErrorCount = 0;
           this.onEndCallback?.();
         };
 
@@ -292,7 +288,6 @@ class SpeechEngine {
         console.warn(`Studio AI Voice failed (attempt ${this.networkErrorCount}/${this.maxNetworkRetries}): ${errMsg}`);
         
         if (this.networkErrorCount < this.maxNetworkRetries) {
-          // Retry with fallback
           console.log('Retrying with browser synthesis...');
           this.speakFallback(cleanText, profile, voiceURI, speedMultiplier);
           return;
@@ -300,7 +295,6 @@ class SpeechEngine {
       }
     }
 
-    // Fallback to optimized natural browser speech synthesis
     this.speakFallback(cleanText, profile, voiceURI, speedMultiplier);
   }
 
