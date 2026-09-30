@@ -1,15 +1,31 @@
-import { PAGES_PART_1 } from './pagesPart1';
-import { PAGES_PART_2 } from './pagesPart2';
-import { PAGES_PART_3 } from './pagesPart3';
-import { PAGES_PART_4 } from './pagesPart4';
 import { BOOK_METADATA, CHAPTERS, BookPage, Chapter } from './bookMeta';
+
+const bookImageAssets = import.meta.glob('../assets/images/*.{jpg,jpeg,png,webp,avif,gif}', {
+  eager: true,
+  import: 'default',
+}) as Record<string, string>;
+
+function resolveBookImageUrl(imagePath?: string): string | undefined {
+  if (!imagePath) return undefined;
+  if (/^(https?:|data:)/i.test(imagePath)) return imagePath;
+  if (!imagePath.startsWith('/src/assets/')) return imagePath;
+
+  const fileName = imagePath.split('/').pop();
+  if (!fileName) return imagePath;
+
+  const resolved = bookImageAssets[`../assets/images/${fileName}`];
+  return typeof resolved === 'string' ? resolved : imagePath;
+}
 
 export const ALL_PAGES: BookPage[] = [
   ...PAGES_PART_1,
   ...PAGES_PART_2,
   ...PAGES_PART_3,
   ...PAGES_PART_4
-];
+].map((page) => ({
+  ...page,
+  image: resolveBookImageUrl(page.image),
+}));
 
 export function getPage(pageNumber: number): BookPage | undefined {
   return ALL_PAGES.find(p => p.pageNumber === pageNumber);
